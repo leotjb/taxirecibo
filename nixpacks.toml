@@ -14,7 +14,7 @@ cmds = [
 ]
 
 [start]
-cmd = "cd server && npx prisma migrate deploy && node dist/index.js"
+cmd = "npx prisma migrate deploy && node dist/index.js"
 
 [variables]
 NODE_ENV = "production"
