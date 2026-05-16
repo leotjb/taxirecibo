@@ -3,12 +3,37 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
+import { execFileSync } from 'child_process';
 import { authRouter } from './routes/auth';
 import { profileRouter } from './routes/profile';
 import { ridesRouter } from './routes/rides';
 import { receiptsRouter } from './routes/receipts';
 import { dashboardRouter } from './routes/dashboard';
 import { errorHandler } from './middleware/errorHandler';
+
+// Executa migrações do banco ao iniciar (sem depender de npx)
+if (process.env.NODE_ENV === 'production') {
+  try {
+    const schemaPath = path.resolve(__dirname, '../prisma/schema.prisma');
+    const possiblePrisma = [
+      path.resolve(__dirname, '../../node_modules/.bin/prisma'),
+      path.resolve(__dirname, '../../../node_modules/.bin/prisma'),
+      path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
+      path.resolve(process.cwd(), 'server/node_modules/.bin/prisma'),
+    ];
+    const prismaBin = possiblePrisma.find(p => fs.existsSync(p));
+    if (prismaBin && fs.existsSync(schemaPath)) {
+      console.log('Executando migração do banco...');
+      execFileSync(prismaBin, ['migrate', 'deploy', '--schema', schemaPath], {
+        stdio: 'inherit',
+        env: process.env,
+      });
+      console.log('Migração concluída.');
+    }
+  } catch (err) {
+    console.warn('Aviso: migração falhou, continuando:', err);
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -51,7 +76,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.listen(PORT, () => {
-  console.log(`🚕 TáxiRecibo server rodando na porta ${PORT}`);
+  console.log(`TaxiRecibo rodando na porta ${PORT}`);
 });
 
 export default app;
