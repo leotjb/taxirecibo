@@ -41,7 +41,7 @@ app.use(errorHandler);
 
 // Em produção, serve o frontend React junto com o backend
 if (process.env.NODE_ENV === 'production') {
-  const clientBuild = path.resolve(__dirname, '../../client/dist');
+  const clientBuild = path.resolve(__dirname, '../../../client/dist');
   if (fs.existsSync(clientBuild)) {
     app.use(express.static(clientBuild));
     app.get('*', (_req, res) => {

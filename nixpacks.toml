@@ -3,20 +3,21 @@ nixPkgs = ["nodejs_20", "chromium", "nss", "atk", "cups", "dbus", "glib", "gtk3"
 
 [phases.install]
 cmds = [
-  "cd server && npm install",
-  "cd client && npm install"
+  "npm install --prefix server",
+  "npm install --prefix client"
 ]
 
 [phases.build]
 cmds = [
-  "cd client && npm run build",
-  "cd server && npx prisma generate && npm run build"
+  "npm run build --prefix client",
+  "npx prisma generate --schema=server/prisma/schema.prisma",
+  "npm run build --prefix server"
 ]
 
 [start]
-cmd = "npx prisma migrate deploy && node dist/index.js"
+cmd = "npx prisma migrate deploy --schema=server/prisma/schema.prisma && node server/dist/index.js"
 
 [variables]
 NODE_ENV = "production"
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
-PUPPETEER_EXECUTABLE_PATH = "/run/current-system/sw/bin/chromium"
+PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
