@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=file:/app/data/taxirecibo.db
+      - JWT_SECRET=${JWT_SECRET:-mude_esta_chave_secreta_para_producao}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-mude_esta_refresh_chave_para_producao}
+      - BASE_URL=${BASE_URL:-http://localhost:3001}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:3001}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

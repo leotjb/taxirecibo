@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  refreshToken  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  profile       TaxiProfile?
+  rides         Ride[]
+}
+
+model TaxiProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName      String
+  licensePlate  String
+  carModel      String
+  carColor      String
+  licenseNumber String
+  photoUrl      String?
+  logoUrl       String?
+
+  pixKey        String?
+  pixBank       String?
+
+  themeColor    String   @default("#F5C518")
+  darkMode      Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Ride {
+  id              String      @id @default(uuid())
+  receiptNumber   Int
+  receiptCode     String      @unique
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rideDate        DateTime
+  passengerName   String
+  passengerEmail  String?
+  passengerPhone  String?
+
+  originAddress   String
+  destAddress     String
+  distanceKm      Float?
+  durationMinutes Int?
+
+  baseValue       Float
+  extras          String      @default("[]")
+  totalValue      Float
+  paymentMethod   String
+
+  observations    String?
+  receiptUrl      String?
+  pdfUrl          String?
+
+  emailSent       Boolean     @default(false)
+  emailSentAt     DateTime?
+  whatsappSent    Boolean     @default(false)
+
+  expiresAt       DateTime
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, receiptNumber])
+}
