@@ -6,3 +6,4 @@ build/
 *.db-journal
 uploads/
 .DS_Store
+*.txt
