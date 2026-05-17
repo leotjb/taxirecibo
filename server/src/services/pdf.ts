@@ -1,5 +1,17 @@
 import puppeteer from 'puppeteer';
+import { execSync } from 'child_process';
 import { Ride, TaxiProfile, User } from '@prisma/client';
+
+const findChromium = (): string | undefined => {
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (envPath) {
+    try { execSync(`test -f "${envPath}"`); return envPath; } catch { /* não existe */ }
+  }
+  for (const cmd of ['chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome']) {
+    try { return execSync(`which ${cmd}`, { encoding: 'utf8' }).trim(); } catch { /* */ }
+  }
+  return undefined;
+};
 
 type RideWithUser = Ride & {
   user: User & { profile: TaxiProfile | null };
@@ -99,9 +111,11 @@ ${ride.observations ? `<div class="section"><div class="section-title">Observaç
 
 export const pdfService = {
   async generate(ride: RideWithUser): Promise<Buffer> {
+    const executablePath = findChromium();
+    console.log('Chromium path:', executablePath || 'não encontrado, usando padrão');
     const browser = await puppeteer.launch({
       headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      executablePath,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     });
 
