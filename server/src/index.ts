@@ -32,23 +32,11 @@ if (process.env.NODE_ENV === 'production') {
     console.log('Prisma bin encontrado:', prismaBin || 'NENHUM');
 
     if (prismaBin && fs.existsSync(schemaPath)) {
-      // Primeiro resolve migrações anteriores com falha
-      try {
-        execFileSync(prismaBin, [
-          'migrate', 'resolve', '--rolled-back', '20260516000000_init',
-          '--schema', schemaPath,
-        ], { stdio: 'inherit', env: process.env });
-        console.log('Migração com falha resolvida.');
-      } catch {
-        // Ignora se não havia migração com falha
-      }
-
-      console.log('Executando migrate deploy...');
-      execFileSync(prismaBin, ['migrate', 'deploy', '--schema', schemaPath], {
-        stdio: 'inherit',
-        env: process.env,
-      });
-      console.log('Migração concluída.');
+      console.log('Executando db push...');
+      execFileSync(prismaBin, [
+        'db', 'push', '--schema', schemaPath, '--skip-generate', '--accept-data-loss',
+      ], { stdio: 'inherit', env: process.env });
+      console.log('Banco sincronizado.');
     } else {
       console.warn('Prisma bin não encontrado. Tentados:', possiblePrisma);
     }
