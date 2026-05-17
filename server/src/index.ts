@@ -11,7 +11,7 @@ import { receiptsRouter } from './routes/receipts';
 import { dashboardRouter } from './routes/dashboard';
 import { errorHandler } from './middleware/errorHandler';
 
-// Executa migrações do banco ao iniciar (sem depender de npx)
+// Executa migrações ao iniciar em produção
 if (process.env.NODE_ENV === 'production') {
   try {
     const schemaPath = path.resolve(__dirname, '../prisma/schema.prisma');
@@ -29,6 +29,8 @@ if (process.env.NODE_ENV === 'production') {
         env: process.env,
       });
       console.log('Migração concluída.');
+    } else {
+      console.log('Prisma bin:', prismaBin, '| Schema:', schemaPath);
     }
   } catch (err) {
     console.warn('Aviso: migração falhou, continuando:', err);
@@ -45,13 +47,14 @@ if (!fs.existsSync(uploadsDir)) {
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || '*',
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(uploadsDir)));
 
+// Rotas da API
 app.use('/api/auth', authRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/rides', ridesRouter);
@@ -62,18 +65,34 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use(errorHandler);
-
-// Em produção, serve o frontend React junto com o backend
+// Serve o frontend em produção (deve ficar ANTES do errorHandler)
 if (process.env.NODE_ENV === 'production') {
-  const clientBuild = path.resolve(__dirname, '../../client/dist');
-  if (fs.existsSync(clientBuild)) {
+  // Tenta vários caminhos possíveis onde o build do cliente pode estar
+  const possibleClientPaths = [
+    path.resolve(__dirname, '../../client/dist'),
+    path.resolve(__dirname, '../../../client/dist'),
+    path.resolve(process.cwd(), 'client/dist'),
+    path.resolve(process.cwd(), '../client/dist'),
+  ];
+
+  const clientBuild = possibleClientPaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+  if (clientBuild) {
+    console.log('Servindo frontend de:', clientBuild);
     app.use(express.static(clientBuild));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(clientBuild, 'index.html'));
     });
+  } else {
+    console.warn('Frontend build não encontrado. Caminhos tentados:', possibleClientPaths);
+    app.get('/', (_req, res) => {
+      res.json({ status: 'ok', message: 'TaxiRecibo API rodando. Frontend não encontrado.' });
+    });
   }
 }
+
+// Error handler (deve ficar por último)
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`TaxiRecibo rodando na porta ${PORT}`);
