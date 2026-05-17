@@ -16,6 +16,9 @@ console.log('PORT:', process.env.PORT);
 console.log('DATABASE_URL definida:', !!process.env.DATABASE_URL);
 console.log('__dirname:', __dirname);
 console.log('process.cwd():', process.cwd());
+try { console.log('/app:', fs.readdirSync('/app').join(', ')); } catch { /* */ }
+try { console.log('/app/server:', fs.readdirSync('/app/server').join(', ')); } catch { /* */ }
+try { console.log('/app/server/dist:', fs.readdirSync('/app/server/dist').join(', ')); } catch { /* */ }
 
 // Executa migrações ao iniciar em produção
 if (process.env.NODE_ENV === 'production') {

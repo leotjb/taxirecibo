@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "prisma generate --schema=prisma/schema.prisma && tsc",
+    "build": "prisma generate --schema=prisma/schema.prisma && tsc && node -e \"const f=require('fs');try{f.cpSync('../client/dist','dist/public',{recursive:true});console.log('Frontend copiado para dist/public');}catch(e){console.warn('Aviso cp:',e.message);}\"",
     "start": "node dist/index.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
