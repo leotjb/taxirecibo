@@ -1,5 +1,4 @@
-import express from 'express';
-import cors from 'cors';
+import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
@@ -23,25 +22,35 @@ if (process.env.NODE_ENV === 'production') {
   try {
     const schemaPath = path.resolve(__dirname, '../prisma/schema.prisma');
     const possiblePrisma = [
-      path.resolve(__dirname, '../../node_modules/.bin/prisma'),
-      path.resolve(__dirname, '../../../node_modules/.bin/prisma'),
-      path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
       path.resolve(process.cwd(), 'server/node_modules/.bin/prisma'),
+      path.resolve(__dirname, '../../node_modules/.bin/prisma'),
+      path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
     ];
 
-    console.log('Procurando prisma em:', possiblePrisma);
     console.log('Schema path:', schemaPath, '| Existe:', fs.existsSync(schemaPath));
-
     const prismaBin = possiblePrisma.find(p => fs.existsSync(p));
+    console.log('Prisma bin encontrado:', prismaBin || 'NENHUM');
+
     if (prismaBin && fs.existsSync(schemaPath)) {
-      console.log('Executando migração com:', prismaBin);
+      // Primeiro resolve migrações anteriores com falha
+      try {
+        execFileSync(prismaBin, [
+          'migrate', 'resolve', '--rolled-back', '20260516000000_init',
+          '--schema', schemaPath,
+        ], { stdio: 'inherit', env: process.env });
+        console.log('Migração com falha resolvida.');
+      } catch {
+        // Ignora se não havia migração com falha
+      }
+
+      console.log('Executando migrate deploy...');
       execFileSync(prismaBin, ['migrate', 'deploy', '--schema', schemaPath], {
         stdio: 'inherit',
         env: process.env,
       });
       console.log('Migração concluída.');
     } else {
-      console.warn('Prisma bin não encontrado. Bin:', prismaBin, '| Schema existe:', fs.existsSync(schemaPath));
+      console.warn('Prisma bin não encontrado. Tentados:', possiblePrisma);
     }
   } catch (err) {
     console.warn('Aviso: migração falhou, continuando:', err);
@@ -52,16 +61,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 const uploadsDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
-console.log('uploads dir:', uploadsDir);
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({
-  origin: process.env.CLIENT_URL || '*',
-  credentials: !!process.env.CLIENT_URL,
-}));
+
+// CORS manual — evita bug do pacote cors com credentials + wildcard
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadsDir));
@@ -77,35 +96,21 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve o frontend em produção (deve ficar ANTES do errorHandler)
-if (process.env.NODE_ENV === 'production') {
-  const possibleClientPaths = [
-    path.resolve(__dirname, '../../client/dist'),
-    path.resolve(__dirname, '../../../client/dist'),
-    path.resolve(process.cwd(), 'client/dist'),
-    path.resolve(process.cwd(), '../client/dist'),
-  ];
+// Serve o frontend (build do Vite vai para server/public/)
+const clientBuild = path.resolve(__dirname, '../public');
+console.log('Caminho do frontend:', clientBuild, '| Existe:', fs.existsSync(path.join(clientBuild, 'index.html')));
 
-  console.log('Procurando build do cliente em:');
-  possibleClientPaths.forEach(p => {
-    const indexExists = fs.existsSync(path.join(p, 'index.html'));
-    console.log(' ', p, '→', indexExists ? 'ENCONTRADO' : 'não encontrado');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(path.join(clientBuild, 'index.html'))) {
+  console.log('Servindo frontend de:', clientBuild);
+  app.use(express.static(clientBuild));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientBuild, 'index.html'));
   });
-
-  const clientBuild = possibleClientPaths.find(p => fs.existsSync(path.join(p, 'index.html')));
-
-  if (clientBuild) {
-    console.log('Servindo frontend de:', clientBuild);
-    app.use(express.static(clientBuild));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(clientBuild, 'index.html'));
-    });
-  } else {
-    console.warn('Frontend build NÃO encontrado.');
-    app.get('/', (_req, res) => {
-      res.json({ status: 'ok', message: 'TaxiRecibo API rodando. Frontend não encontrado.' });
-    });
-  }
+} else if (process.env.NODE_ENV === 'production') {
+  console.warn('Frontend build não encontrado em:', clientBuild);
+  app.get('/', (_req, res) => {
+    res.json({ status: 'ok', message: 'API rodando. Frontend não encontrado.' });
+  });
 }
 
 // Error handler (deve ficar por último)
