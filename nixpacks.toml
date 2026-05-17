@@ -10,9 +10,9 @@ cmds = [
 [phases.build]
 cmds = [
   "npm run build --prefix client",
-  "mkdir -p server/public && cp -r client/dist/. server/public/",
   "server/node_modules/.bin/prisma generate --schema=server/prisma/schema.prisma",
-  "npm run build --prefix server"
+  "npm run build --prefix server",
+  "cp -r client/dist server/dist/public"
 ]
 
 [variables]

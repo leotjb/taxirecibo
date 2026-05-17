@@ -84,21 +84,33 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve o frontend (build do Vite vai para server/public/)
-const clientBuild = path.resolve(__dirname, '../public');
-console.log('Caminho do frontend:', clientBuild, '| Existe:', fs.existsSync(path.join(clientBuild, 'index.html')));
+// Serve o frontend em produção
+if (process.env.NODE_ENV === 'production') {
+  const candidatos = [
+    path.resolve(__dirname, 'public'),            // server/dist/public  ← cp do nixpacks
+    path.resolve(__dirname, '../public'),          // server/public
+    path.resolve(__dirname, '../../client/dist'),  // client/dist
+    path.resolve(process.cwd(), 'client/dist'),   // /app/client/dist
+  ];
 
-if (process.env.NODE_ENV === 'production' && fs.existsSync(path.join(clientBuild, 'index.html'))) {
-  console.log('Servindo frontend de:', clientBuild);
-  app.use(express.static(clientBuild));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(clientBuild, 'index.html'));
+  candidatos.forEach(p => {
+    console.log('Frontend?', p, '→', fs.existsSync(path.join(p, 'index.html')) ? 'SIM' : 'não');
   });
-} else if (process.env.NODE_ENV === 'production') {
-  console.warn('Frontend build não encontrado em:', clientBuild);
-  app.get('/', (_req, res) => {
-    res.json({ status: 'ok', message: 'API rodando. Frontend não encontrado.' });
-  });
+
+  const clientBuild = candidatos.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+  if (clientBuild) {
+    console.log('Servindo frontend de:', clientBuild);
+    app.use(express.static(clientBuild));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(clientBuild, 'index.html'));
+    });
+  } else {
+    console.warn('Frontend não encontrado em nenhum caminho.');
+    app.get('/', (_req, res) => {
+      res.json({ status: 'ok', message: 'API rodando. Frontend não encontrado.' });
+    });
+  }
 }
 
 // Error handler (deve ficar por último)
