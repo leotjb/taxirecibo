@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "chromium", "nss", "atk", "cups", "dbus", "glib", "gtk3"]
+nixPkgs = ["nodejs_20", "chromium", "nss", "atk", "cups", "dbus", "glib", "gtk3", "openssl"]
 
 [phases.install]
 cmds = [
@@ -13,9 +13,6 @@ cmds = [
   "npx prisma generate --schema=server/prisma/schema.prisma",
   "npm run build --prefix server"
 ]
-
-[start]
-cmd = "npx prisma migrate deploy --schema=server/prisma/schema.prisma && node server/dist/index.js"
 
 [variables]
 NODE_ENV = "production"
