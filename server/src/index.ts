@@ -11,6 +11,13 @@ import { receiptsRouter } from './routes/receipts';
 import { dashboardRouter } from './routes/dashboard';
 import { errorHandler } from './middleware/errorHandler';
 
+console.log('=== TaxiRecibo iniciando ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('DATABASE_URL definida:', !!process.env.DATABASE_URL);
+console.log('__dirname:', __dirname);
+console.log('process.cwd():', process.cwd());
+
 // Executa migrações ao iniciar em produção
 if (process.env.NODE_ENV === 'production') {
   try {
@@ -21,16 +28,20 @@ if (process.env.NODE_ENV === 'production') {
       path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
       path.resolve(process.cwd(), 'server/node_modules/.bin/prisma'),
     ];
+
+    console.log('Procurando prisma em:', possiblePrisma);
+    console.log('Schema path:', schemaPath, '| Existe:', fs.existsSync(schemaPath));
+
     const prismaBin = possiblePrisma.find(p => fs.existsSync(p));
     if (prismaBin && fs.existsSync(schemaPath)) {
-      console.log('Executando migração do banco...');
+      console.log('Executando migração com:', prismaBin);
       execFileSync(prismaBin, ['migrate', 'deploy', '--schema', schemaPath], {
         stdio: 'inherit',
         env: process.env,
       });
       console.log('Migração concluída.');
     } else {
-      console.log('Prisma bin:', prismaBin, '| Schema:', schemaPath);
+      console.warn('Prisma bin não encontrado. Bin:', prismaBin, '| Schema existe:', fs.existsSync(schemaPath));
     }
   } catch (err) {
     console.warn('Aviso: migração falhou, continuando:', err);
@@ -40,7 +51,8 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const uploadsDir = process.env.UPLOAD_DIR || './uploads';
+const uploadsDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+console.log('uploads dir:', uploadsDir);
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -52,7 +64,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.resolve(uploadsDir)));
+app.use('/uploads', express.static(uploadsDir));
 
 // Rotas da API
 app.use('/api/auth', authRouter);
@@ -67,13 +79,18 @@ app.get('/api/health', (_req, res) => {
 
 // Serve o frontend em produção (deve ficar ANTES do errorHandler)
 if (process.env.NODE_ENV === 'production') {
-  // Tenta vários caminhos possíveis onde o build do cliente pode estar
   const possibleClientPaths = [
     path.resolve(__dirname, '../../client/dist'),
     path.resolve(__dirname, '../../../client/dist'),
     path.resolve(process.cwd(), 'client/dist'),
     path.resolve(process.cwd(), '../client/dist'),
   ];
+
+  console.log('Procurando build do cliente em:');
+  possibleClientPaths.forEach(p => {
+    const indexExists = fs.existsSync(path.join(p, 'index.html'));
+    console.log(' ', p, '→', indexExists ? 'ENCONTRADO' : 'não encontrado');
+  });
 
   const clientBuild = possibleClientPaths.find(p => fs.existsSync(path.join(p, 'index.html')));
 
@@ -84,7 +101,7 @@ if (process.env.NODE_ENV === 'production') {
       res.sendFile(path.join(clientBuild, 'index.html'));
     });
   } else {
-    console.warn('Frontend build não encontrado. Caminhos tentados:', possibleClientPaths);
+    console.warn('Frontend build NÃO encontrado.');
     app.get('/', (_req, res) => {
       res.json({ status: 'ok', message: 'TaxiRecibo API rodando. Frontend não encontrado.' });
     });

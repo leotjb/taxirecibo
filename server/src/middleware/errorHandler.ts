@@ -7,21 +7,21 @@ export interface AppError extends Error {
 
 export const errorHandler = (
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Erro interno do servidor';
 
-  if (process.env.NODE_ENV === 'development') {
-    console.error(err);
-  }
+  console.error(`[ERROR] ${req.method} ${req.path} → ${statusCode}: ${err.message}`);
+  if (err.stack) console.error(err.stack);
 
   res.status(statusCode).json({
     success: false,
     message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    debug: err.message,
+    path: req.path,
   });
 };
 
