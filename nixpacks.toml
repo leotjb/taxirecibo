@@ -2,18 +2,10 @@
 nixPkgs = ["nodejs_20", "chromium", "nss", "atk", "cups", "dbus", "glib", "gtk3", "openssl"]
 
 [phases.install]
-cmds = [
-  "npm install --prefix server",
-  "npm install --prefix client"
-]
+cmds = ["npm install --include=dev"]
 
 [phases.build]
-cmds = [
-  "npm run build --prefix client",
-  "server/node_modules/.bin/prisma generate --schema=server/prisma/schema.prisma",
-  "npm run build --prefix server",
-  "cp -r client/dist server/dist/public"
-]
+cmds = ["npm run build"]
 
 [variables]
 NODE_ENV = "production"
