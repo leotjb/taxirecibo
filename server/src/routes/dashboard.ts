@@ -30,8 +30,12 @@ dashboardRouter.get('/', async (req: AuthRequest, res, next) => {
       }),
     ]);
 
-    const sum = (rides: { totalValue: number }[]) => rides.reduce((a, r) => a + r.totalValue, 0);
-    const maxRide = allRides.reduce((max, r) => r.totalValue > (max?.totalValue ?? 0) ? r : max, allRides[0]);
+    const sum = (rides: { totalValue: number }[]) => rides.reduce((a: number, r) => a + r.totalValue, 0);
+    type RideVal = { totalValue: number; paymentMethod: string };
+    const maxRide = allRides.reduce(
+      (max: RideVal | undefined, r: RideVal) => (!max || r.totalValue > max.totalValue) ? r : max,
+      undefined
+    );
 
     const paymentCounts: Record<string, number> = {};
     for (const ride of allRides) {
