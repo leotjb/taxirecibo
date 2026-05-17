@@ -13,43 +13,34 @@ import { errorHandler } from './middleware/errorHandler';
 console.log('=== TaxiRecibo iniciando ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('PORT:', process.env.PORT);
-console.log('DATABASE_URL definida:', !!process.env.DATABASE_URL);
-console.log('__dirname:', __dirname);
-console.log('process.cwd():', process.cwd());
-try { console.log('/app:', fs.readdirSync('/app').join(', ')); } catch { /* */ }
-try { console.log('/app/server:', fs.readdirSync('/app/server').join(', ')); } catch { /* */ }
-try { console.log('/app/server/dist:', fs.readdirSync('/app/server/dist').join(', ')); } catch { /* */ }
 
-// Executa migrações ao iniciar em produção
+// Sincroniza banco de dados ao iniciar em produção
 if (process.env.NODE_ENV === 'production') {
   try {
     const schemaPath = path.resolve(__dirname, '../prisma/schema.prisma');
     const possiblePrisma = [
+      path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
       path.resolve(process.cwd(), 'server/node_modules/.bin/prisma'),
       path.resolve(__dirname, '../../node_modules/.bin/prisma'),
-      path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
     ];
-
-    console.log('Schema path:', schemaPath, '| Existe:', fs.existsSync(schemaPath));
     const prismaBin = possiblePrisma.find(p => fs.existsSync(p));
-    console.log('Prisma bin encontrado:', prismaBin || 'NENHUM');
-
     if (prismaBin && fs.existsSync(schemaPath)) {
-      console.log('Executando db push...');
+      console.log('Sincronizando banco de dados...');
       execFileSync(prismaBin, [
         'db', 'push', '--schema', schemaPath, '--skip-generate', '--accept-data-loss',
       ], { stdio: 'inherit', env: process.env });
       console.log('Banco sincronizado.');
-    } else {
-      console.warn('Prisma bin não encontrado. Tentados:', possiblePrisma);
     }
   } catch (err) {
-    console.warn('Aviso: migração falhou, continuando:', err);
+    console.warn('Aviso: sincronização do banco falhou, continuando:', err);
   }
 }
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Necessário para rate limiter funcionar corretamente atrás do proxy do Railway
+app.set('trust proxy', 1);
 
 const uploadsDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -58,7 +49,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// CORS manual — evita bug do pacote cors com credentials + wildcard
+// CORS manual — compatível com wildcard + credentials
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
@@ -87,32 +78,17 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve o frontend em produção
+// Serve o frontend React em produção
 if (process.env.NODE_ENV === 'production') {
-  const candidatos = [
-    path.resolve(__dirname, 'public'),            // server/dist/public  ← cp do nixpacks
-    path.resolve(__dirname, '../public'),          // server/public
-    path.resolve(__dirname, '../../client/dist'),  // client/dist
-    path.resolve(process.cwd(), 'client/dist'),   // /app/client/dist
-  ];
-
-  candidatos.forEach(p => {
-    console.log('Frontend?', p, '→', fs.existsSync(path.join(p, 'index.html')) ? 'SIM' : 'não');
-  });
-
-  const clientBuild = candidatos.find(p => fs.existsSync(path.join(p, 'index.html')));
-
-  if (clientBuild) {
+  const clientBuild = path.resolve(__dirname, 'public');
+  if (fs.existsSync(path.join(clientBuild, 'index.html'))) {
     console.log('Servindo frontend de:', clientBuild);
     app.use(express.static(clientBuild));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(clientBuild, 'index.html'));
     });
   } else {
-    console.warn('Frontend não encontrado em nenhum caminho.');
-    app.get('/', (_req, res) => {
-      res.json({ status: 'ok', message: 'API rodando. Frontend não encontrado.' });
-    });
+    console.warn('Frontend não encontrado em:', clientBuild);
   }
 }
 

@@ -15,13 +15,10 @@ export const errorHandler = (
   const message = err.isOperational ? err.message : 'Erro interno do servidor';
 
   console.error(`[ERROR] ${req.method} ${req.path} → ${statusCode}: ${err.message}`);
-  if (err.stack) console.error(err.stack);
 
   res.status(statusCode).json({
     success: false,
     message,
-    debug: err.message,
-    path: req.path,
   });
 };
 
