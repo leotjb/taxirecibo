@@ -8,6 +8,7 @@ import { profileRouter } from './routes/profile';
 import { ridesRouter } from './routes/rides';
 import { receiptsRouter } from './routes/receipts';
 import { dashboardRouter } from './routes/dashboard';
+import { veiculoRouter } from './routes/veiculo';
 import { errorHandler } from './middleware/errorHandler';
 
 console.log('=== TaxiRecibo iniciando ===');
@@ -73,6 +74,7 @@ app.use('/api/profile', profileRouter);
 app.use('/api/rides', ridesRouter);
 app.use('/api/receipts', receiptsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/veiculo', veiculoRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

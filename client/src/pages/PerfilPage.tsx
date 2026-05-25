@@ -6,10 +6,29 @@ import { Camera, Moon, Sun, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import PlacaInput from '../components/PlacaInput';
+
+// Modelos populares de táxi no Brasil (para autocomplete)
+const MODELOS_TAXI = [
+  'Toyota Corolla', 'Toyota Etios', 'Toyota Yaris',
+  'Volkswagen Voyage', 'Volkswagen Polo', 'Volkswagen Virtus', 'Volkswagen Fox',
+  'Chevrolet Onix', 'Chevrolet Cobalt', 'Chevrolet Prisma',
+  'Hyundai HB20', 'Hyundai HB20S', 'Hyundai Elantra',
+  'Ford Ka', 'Ford Ka Sedan',
+  'Renault Logan', 'Renault Sandero',
+  'Fiat Grand Siena', 'Fiat Cronos', 'Fiat Argo',
+  'Honda City', 'Honda Fit',
+  'Nissan Versa', 'Nissan March',
+  'Peugeot 208', 'Peugeot 2008',
+  'Citroën C3',
+  'Kia Cerato', 'Kia Rio',
+];
+
+const CORES = ['Branco', 'Prata', 'Preto', 'Cinza', 'Azul', 'Vermelho', 'Amarelo', 'Verde', 'Bege'];
 
 const schema = z.object({
   fullName: z.string().min(2, 'Nome obrigatório'),
-  licensePlate: z.string().min(1, 'Placa obrigatória'),
+  licensePlate: z.string().min(7, 'Placa obrigatória'),
   carModel: z.string().min(1, 'Modelo obrigatório'),
   carColor: z.string().min(1, 'Cor obrigatória'),
   licenseNumber: z.string().min(1, 'Número de habilitação obrigatório'),
@@ -26,30 +45,30 @@ export default function PerfilPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [placaValue, setPlacaValue] = useState('');
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      themeColor: '#F5C518',
-      darkMode: false,
-    },
+    defaultValues: { themeColor: '#F5C518', darkMode: false },
   });
 
   const darkMode = watch('darkMode');
 
   useEffect(() => {
     if (user?.profile) {
+      const p = user.profile;
       reset({
-        fullName: user.profile.fullName,
-        licensePlate: user.profile.licensePlate,
-        carModel: user.profile.carModel,
-        carColor: user.profile.carColor,
-        licenseNumber: user.profile.licenseNumber,
-        pixKey: user.profile.pixKey || '',
-        pixBank: user.profile.pixBank || '',
-        themeColor: user.profile.themeColor || '#F5C518',
-        darkMode: user.profile.darkMode || false,
+        fullName: p.fullName,
+        licensePlate: p.licensePlate,
+        carModel: p.carModel,
+        carColor: p.carColor,
+        licenseNumber: p.licenseNumber,
+        pixKey: p.pixKey || '',
+        pixBank: p.pixBank || '',
+        themeColor: p.themeColor || '#F5C518',
+        darkMode: p.darkMode || false,
       });
+      setPlacaValue(p.licensePlate || '');
     }
   }, [user, reset]);
 
@@ -57,13 +76,29 @@ export default function PerfilPage() {
     document.documentElement.classList.toggle('dark', !!darkMode);
   }, [darkMode]);
 
+  // Sincroniza o campo licensePlate do form com o PlacaInput
+  const handlePlacaChange = (val: string) => {
+    setPlacaValue(val);
+    setValue('licensePlate', val, { shouldValidate: true });
+  };
+
+  // Quando a consulta da placa retornar dados, preenche o form
+  const handleVeiculoEncontrado = (dados: {
+    modelo?: string; cor?: string; marca?: string;
+  }) => {
+    if (dados.modelo) setValue('carModel', dados.modelo);
+    if (dados.cor) setValue('carColor', dados.cor);
+    toast.success('Dados do veículo preenchidos automaticamente!');
+  };
+
   const onSubmit = async (data: FormData) => {
     try {
       await api.put('/profile', data);
       await refreshUser();
       toast.success('Perfil atualizado com sucesso!');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro ao salvar perfil';
+      const msg = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message || 'Erro ao salvar perfil';
       toast.error(msg);
     }
   };
@@ -92,22 +127,19 @@ export default function PerfilPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400">Configure seus dados profissionais</p>
       </div>
 
-      {/* Photo & Logo */}
+      {/* Foto e Logo */}
       <div className="card p-4">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wide mb-4">Foto e Logo</h2>
         <div className="flex gap-4">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden border-2 border-taxi-yellow relative">
+            <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden border-2 border-taxi-yellow">
               {user?.profile?.photoUrl
                 ? <img src={user.profile.photoUrl} alt="Foto" className="w-full h-full object-cover" />
                 : <div className="w-full h-full flex items-center justify-center"><Camera className="w-7 h-7 text-gray-300" /></div>
               }
             </div>
-            <button
-              onClick={() => photoInputRef.current?.click()}
-              disabled={uploadingPhoto}
-              className="text-xs text-taxi-yellow font-medium flex items-center gap-1"
-            >
+            <button onClick={() => photoInputRef.current?.click()} disabled={uploadingPhoto}
+              className="text-xs text-taxi-yellow font-medium flex items-center gap-1">
               {uploadingPhoto ? <span className="w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" /> : <Upload className="w-3 h-3" />}
               Foto
             </button>
@@ -115,17 +147,14 @@ export default function PerfilPage() {
           </div>
 
           <div className="flex flex-col items-center gap-2">
-            <div className="w-20 h-20 rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 relative">
+            <div className="w-20 h-20 rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700">
               {user?.profile?.logoUrl
                 ? <img src={user.profile.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
-                : <div className="w-full h-full flex items-center justify-center text-center p-2"><p className="text-xs text-gray-400">Sem logo</p></div>
+                : <div className="w-full h-full flex items-center justify-center"><p className="text-xs text-gray-400 text-center p-2">Sem logo</p></div>
               }
             </div>
-            <button
-              onClick={() => logoInputRef.current?.click()}
-              disabled={uploadingLogo}
-              className="text-xs text-taxi-yellow font-medium flex items-center gap-1"
-            >
+            <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}
+              className="text-xs text-taxi-yellow font-medium flex items-center gap-1">
               {uploadingLogo ? <span className="w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" /> : <Upload className="w-3 h-3" />}
               Logo
             </button>
@@ -144,7 +173,7 @@ export default function PerfilPage() {
             {errors.fullName && <p className="error-text">{errors.fullName.message}</p>}
           </div>
           <div>
-            <label className="label">Número de Habilitação</label>
+            <label className="label">Número de Habilitação (CNH)</label>
             <input {...register('licenseNumber')} placeholder="12345678901" className="input-field" />
             {errors.licenseNumber && <p className="error-text">{errors.licenseNumber.message}</p>}
           </div>
@@ -153,22 +182,43 @@ export default function PerfilPage() {
         {/* Dados do veículo */}
         <div className="card p-4 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wide">Veículo</h2>
+
           <div>
             <label className="label">Placa</label>
-            <input {...register('licensePlate')} placeholder="ABC-1234" className="input-field uppercase" />
-            {errors.licensePlate && <p className="error-text">{errors.licensePlate.message}</p>}
+            <PlacaInput
+              value={placaValue}
+              onChange={handlePlacaChange}
+              onVeiculoEncontrado={handleVeiculoEncontrado}
+              error={errors.licensePlate?.message}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Modelo</label>
-              <input {...register('carModel')} placeholder="Toyota Corolla" className="input-field" />
-              {errors.carModel && <p className="error-text">{errors.carModel.message}</p>}
-            </div>
-            <div>
-              <label className="label">Cor</label>
-              <input {...register('carColor')} placeholder="Branco" className="input-field" />
-              {errors.carColor && <p className="error-text">{errors.carColor.message}</p>}
-            </div>
+
+          <div>
+            <label className="label">Modelo</label>
+            <input
+              {...register('carModel')}
+              list="modelos-taxi"
+              placeholder="Ex: Toyota Corolla"
+              className="input-field"
+            />
+            <datalist id="modelos-taxi">
+              {MODELOS_TAXI.map(m => <option key={m} value={m} />)}
+            </datalist>
+            {errors.carModel && <p className="error-text">{errors.carModel.message}</p>}
+          </div>
+
+          <div>
+            <label className="label">Cor</label>
+            <input
+              {...register('carColor')}
+              list="cores-veiculo"
+              placeholder="Ex: Branco"
+              className="input-field"
+            />
+            <datalist id="cores-veiculo">
+              {CORES.map(c => <option key={c} value={c} />)}
+            </datalist>
+            {errors.carColor && <p className="error-text">{errors.carColor.message}</p>}
           </div>
         </div>
 
@@ -181,7 +231,7 @@ export default function PerfilPage() {
           </div>
           <div>
             <label className="label">Banco</label>
-            <input {...register('pixBank')} placeholder="Nome do banco" className="input-field" />
+            <input {...register('pixBank')} placeholder="Ex: Nubank, Banco do Brasil, Caixa" className="input-field" />
           </div>
         </div>
 
@@ -196,8 +246,7 @@ export default function PerfilPage() {
                 {['#F5C518', '#2563EB', '#16a34a', '#dc2626', '#7c3aed'].map(c => (
                   <button key={c} type="button" onClick={() => setValue('themeColor', c)}
                     className="w-7 h-7 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-transform"
-                    style={{ background: c }}
-                  />
+                    style={{ background: c }} />
                 ))}
               </div>
             </div>
@@ -216,12 +265,10 @@ export default function PerfilPage() {
         </div>
 
         <button type="submit" disabled={isSubmitting} className="btn-primary w-full text-base py-3">
-          {isSubmitting ? (
-            <span className="flex items-center gap-2">
-              <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              Salvando...
-            </span>
-          ) : 'Salvar Perfil'}
+          {isSubmitting
+            ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />Salvando...</span>
+            : 'Salvar Perfil'
+          }
         </button>
       </form>
     </div>
